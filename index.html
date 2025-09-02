@@ -76,7 +76,7 @@
 
                     <!-- Pending Approvals -->
                     <div class="pending-section">
-                        <h3>승인 대기중인 신청서</h3>
+                        <h3>승인 대기중인 신청서 (<span id="pendingCount">0</span>건)</h3>
                         <div class="card">
                             <div class="card__body">
                                 <div id="pendingList" class="pending-list"></div>
@@ -84,12 +84,99 @@
                         </div>
                     </div>
 
-                    <!-- Calendar View -->
+                    <!-- Enhanced Calendar View -->
                     <div class="calendar-section">
-                        <h3>이번 달 휴가·휴직 현황</h3>
+                        <div class="calendar-header">
+                            <h3>월별 휴가·휴직 현황</h3>
+                            <div class="calendar-controls">
+                                <button class="btn btn--sm btn--secondary" id="todayBtn">오늘</button>
+                                <button class="btn btn--sm btn--outline" id="exportBtn">📄 Excel 내보내기</button>
+                            </div>
+                        </div>
+                        
                         <div class="card">
                             <div class="card__body">
+                                <!-- Calendar Navigation -->
+                                <div class="calendar-nav">
+                                    <button class="calendar-nav-btn" id="prevMonthBtn">‹</button>
+                                    <div class="calendar-date-selector">
+                                        <select id="yearSelect" class="form-control calendar-select">
+                                            <option value="2023">2023년</option>
+                                            <option value="2024">2024년</option>
+                                            <option value="2025" selected>2025년</option>
+                                            <option value="2026">2026년</option>
+                                            <option value="2027">2027년</option>
+                                        </select>
+                                        <select id="monthSelect" class="form-control calendar-select">
+                                            <option value="0">1월</option>
+                                            <option value="1">2월</option>
+                                            <option value="2">3월</option>
+                                            <option value="3">4월</option>
+                                            <option value="4">5월</option>
+                                            <option value="5">6월</option>
+                                            <option value="6">7월</option>
+                                            <option value="7">8월</option>
+                                            <option value="8" selected>9월</option>
+                                            <option value="9">10월</option>
+                                            <option value="10">11월</option>
+                                            <option value="11">12월</option>
+                                        </select>
+                                    </div>
+                                    <button class="calendar-nav-btn" id="nextMonthBtn">›</button>
+                                </div>
+
+                                <!-- Calendar Legend -->
+                                <div class="calendar-legend">
+                                    <div class="legend-item">
+                                        <span class="legend-color" style="background-color: var(--color-success);"></span>
+                                        <span>연가</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-color" style="background-color: var(--color-warning);"></span>
+                                        <span>병가</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-color" style="background-color: var(--color-primary);"></span>
+                                        <span>공가</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-color" style="background-color: #9C27B0;"></span>
+                                        <span>특별휴가</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-color" style="background-color: #607D8B;"></span>
+                                        <span>장기재직휴가</span>
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="legend-color" style="background-color: var(--color-error);"></span>
+                                        <span>휴직</span>
+                                    </div>
+                                </div>
+
+                                <!-- Calendar Grid -->
                                 <div id="calendarView" class="calendar-view"></div>
+
+                                <!-- Month Summary -->
+                                <div class="month-summary">
+                                    <div class="summary-stats">
+                                        <div class="stat-item">
+                                            <span class="stat-label">이번 달 총 휴가일수</span>
+                                            <span class="stat-value" id="monthTotalDays">0일</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">승인 대기</span>
+                                            <span class="stat-value" id="monthPendingCount">0건</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">승인 완료</span>
+                                            <span class="stat-value" id="monthApprovedCount">0건</span>
+                                        </div>
+                                        <div class="stat-item">
+                                            <span class="stat-label">반려</span>
+                                            <span class="stat-value" id="monthRejectedCount">0건</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -378,6 +465,19 @@
                     <button class="btn btn--secondary" onclick="closeConfirmModal()">취소</button>
                     <button class="btn btn--danger" id="confirmButton">삭제</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Day Detail Modal -->
+    <div id="dayDetailModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="dayDetailTitle">날짜별 일정</h3>
+                <button class="modal-close" onclick="closeDayDetailModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="dayDetailBody"></div>
             </div>
         </div>
     </div>

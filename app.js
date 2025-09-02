@@ -128,13 +128,43 @@ const appData = {
       teacherId: 5,
       teacherName: "최지원",
       type: "특별휴가",
-      startDate: "2025-09-10",
-      endDate: "2025-09-10",
+      startDate: "2025-08-10",
+      endDate: "2025-08-10",
       days: 1,
       reason: "결혼",
       status: "승인",
-      appliedDate: "2025-08-30",
-      approvedDate: "2025-08-31",
+      appliedDate: "2025-07-30",
+      approvedDate: "2025-07-31",
+      approver: "교무부장",
+      rejectReason: null
+    },
+    {
+      id: 5,
+      teacherId: 1,
+      teacherName: "김영희",
+      type: "연가",
+      startDate: "2025-10-15",
+      endDate: "2025-10-16",
+      days: 2,
+      reason: "가족여행",
+      status: "승인대기",
+      appliedDate: "2025-09-01",
+      approvedDate: null,
+      approver: null,
+      rejectReason: null
+    },
+    {
+      id: 6,
+      teacherId: 2,
+      teacherName: "박민수",
+      type: "연가",
+      startDate: "2025-07-22",
+      endDate: "2025-07-24",
+      days: 3,
+      reason: "개인사정",
+      status: "승인",
+      appliedDate: "2025-07-10",
+      approvedDate: "2025-07-11",
       approver: "교무부장",
       rejectReason: null
     }
@@ -204,18 +234,18 @@ const config = {
   subjects: ["국어", "수학", "영어", "과학", "사회", "체육", "음악", "미술", "기술가정", "한문", "정보", "진로"],
   positions: ["교장", "교감", "수석교사", "정교사", "기간제교사"],
   leaveTypes: {
-    "연가": { maxDays: 25, description: "재직기간에 따라 15-25일" },
-    "병가": { maxDays: 60, description: "일반병가 연60일, 공무상병가 연180일" },
-    "공가": { maxDays: -1, description: "공적사유 휴가" },
-    "특별휴가": { maxDays: 5, description: "결혼, 출산, 사망 등" },
-    "장기재직휴가": { maxDays: 7, description: "10년이상 5일, 20년이상 7일" }
+    "연가": { maxDays: 25, description: "재직기간에 따라 15-25일", color: "#4CAF50" },
+    "병가": { maxDays: 60, description: "일반병가 연60일, 공무상병가 연180일", color: "#FF9800" },
+    "공가": { maxDays: -1, description: "공적사유 휴가", color: "#2196F3" },
+    "특별휴가": { maxDays: 5, description: "결혼, 출산, 사망 등", color: "#9C27B0" },
+    "장기재직휴가": { maxDays: 7, description: "10년이상 5일, 20년이상 7일", color: "#607D8B" }
   },
   absenceTypes: {
-    "질병휴직": { maxMonths: 12, description: "1년이내, 공무상은 3년" },
-    "병역휴직": { maxMonths: 36, description: "복무기간" },
-    "육아휴직": { maxMonths: 36, description: "자녀1명당 1년, 여교원 3년" },
-    "유학휴직": { maxMonths: 36, description: "3년이내" },
-    "가족돌봄휴직": { maxMonths: 12, description: "1년이내, 총3년" }
+    "질병휴직": { maxMonths: 12, description: "1년이내, 공무상은 3년", color: "#F44336" },
+    "병역휴직": { maxMonths: 36, description: "복무기간", color: "#795548" },
+    "육아휴직": { maxMonths: 36, description: "자녀1명당 1년, 여교원 3년", color: "#E91E63" },
+    "유학휴직": { maxMonths: 36, description: "3년이내", color: "#3F51B5" },
+    "가족돌봄휴직": { maxMonths: 12, description: "1년이내, 총3년", color: "#009688" }
   }
 };
 
@@ -224,10 +254,14 @@ let currentTab = 'dashboard';
 let charts = {};
 let nextId = {
   teachers: 6,
-  leaveApplications: 5,
+  leaveApplications: 7,
   leaveOfAbsenceApplications: 2,
   contractTeachers: 4
 };
+
+// Calendar state - Initialize with 2025 September
+let currentCalendarYear = 2025;
+let currentCalendarMonth = 8; // September (0-based index)
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
@@ -236,11 +270,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function initializeApp() {
   setCurrentDate();
+  initializeCalendar();
   setupEventListeners();
   populateFilters();
   renderDashboard();
   renderAllTables();
   setupSearchAndFilters();
+  setupKeyboardShortcuts();
+  loadCalendarStateFromURL();
 }
 
 function setCurrentDate() {
@@ -255,6 +292,13 @@ function setCurrentDate() {
     now.toLocaleDateString('ko-KR', options);
 }
 
+function initializeCalendar() {
+  // Set current calendar to September 2025 as specified
+  currentCalendarYear = 2025;
+  currentCalendarMonth = 8; // September (0-based)
+  updateCalendarSelectors();
+}
+
 function setupEventListeners() {
   // Tab switching
   document.querySelectorAll('.nav-tab').forEach(tab => {
@@ -264,10 +308,14 @@ function setupEventListeners() {
     });
   });
 
+  // Calendar controls
+  setupCalendarControls();
+
   // Global modal close handlers
   document.addEventListener('click', function(e) {
     const modal = document.getElementById('universalModal');
     const confirmModal = document.getElementById('confirmModal');
+    const dayModal = document.getElementById('dayDetailModal');
     
     if (modal && e.target === modal) {
       closeModal();
@@ -276,6 +324,10 @@ function setupEventListeners() {
     if (confirmModal && e.target === confirmModal) {
       closeConfirmModal();
     }
+
+    if (dayModal && e.target === dayModal) {
+      closeDayDetailModal();
+    }
   });
 
   // Escape key to close modals
@@ -283,8 +335,276 @@ function setupEventListeners() {
     if (e.key === 'Escape') {
       closeModal();
       closeConfirmModal();
+      closeDayDetailModal();
     }
   });
+
+  // Browser back/forward handling
+  window.addEventListener('popstate', function(e) {
+    if (e.state && e.state.year && e.state.month !== undefined) {
+      currentCalendarYear = e.state.year;
+      currentCalendarMonth = e.state.month;
+      updateCalendarSelectors();
+      renderCalendarView();
+      updateMonthSummary();
+    }
+  });
+}
+
+function setupCalendarControls() {
+  // Today button
+  const todayBtn = document.getElementById('todayBtn');
+  if (todayBtn) {
+    todayBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      goToToday();
+    });
+  }
+
+  // Export button
+  const exportBtn = document.getElementById('exportBtn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      exportMonthData();
+    });
+  }
+
+  // Navigation buttons
+  const prevBtn = document.getElementById('prevMonthBtn');
+  const nextBtn = document.getElementById('nextMonthBtn');
+  
+  if (prevBtn) {
+    prevBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      goToPreviousMonth();
+    });
+  }
+  
+  if (nextBtn) {
+    nextBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      goToNextMonth();
+    });
+  }
+
+  // Year and month selectors
+  const yearSelect = document.getElementById('yearSelect');
+  const monthSelect = document.getElementById('monthSelect');
+  
+  if (yearSelect) {
+    yearSelect.addEventListener('change', function(e) {
+      currentCalendarYear = parseInt(this.value);
+      renderCalendarView();
+      updateMonthSummary();
+      updateURLState();
+      saveCalendarState();
+    });
+  }
+  
+  if (monthSelect) {
+    monthSelect.addEventListener('change', function(e) {
+      currentCalendarMonth = parseInt(this.value);
+      renderCalendarView();
+      updateMonthSummary();
+      updateURLState();
+      saveCalendarState();
+    });
+  }
+}
+
+function setupKeyboardShortcuts() {
+  document.addEventListener('keydown', function(e) {
+    // Only handle shortcuts when no modal is open and no input is focused
+    if (document.querySelector('.modal:not(.hidden)') || 
+        document.activeElement.tagName === 'INPUT' || 
+        document.activeElement.tagName === 'SELECT' ||
+        document.activeElement.tagName === 'TEXTAREA') {
+      return;
+    }
+
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      goToPreviousMonth();
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      goToNextMonth();
+    } else if (e.key === 'Home') {
+      e.preventDefault();
+      goToToday();
+    }
+  });
+}
+
+function updateCalendarSelectors() {
+  const yearSelect = document.getElementById('yearSelect');
+  const monthSelect = document.getElementById('monthSelect');
+  
+  if (yearSelect) {
+    yearSelect.value = currentCalendarYear.toString();
+  }
+  
+  if (monthSelect) {
+    monthSelect.value = currentCalendarMonth.toString();
+  }
+}
+
+function goToToday() {
+  const today = new Date();
+  currentCalendarYear = today.getFullYear();
+  currentCalendarMonth = today.getMonth();
+  updateCalendarSelectors();
+  renderCalendarView();
+  updateMonthSummary();
+  updateURLState();
+  saveCalendarState();
+  showToast('현재 월로 이동했습니다.', 'info');
+}
+
+function goToPreviousMonth() {
+  if (currentCalendarMonth === 0) {
+    currentCalendarMonth = 11;
+    currentCalendarYear--;
+  } else {
+    currentCalendarMonth--;
+  }
+  updateCalendarSelectors();
+  renderCalendarView();
+  updateMonthSummary();
+  updateURLState();
+  saveCalendarState();
+}
+
+function goToNextMonth() {
+  if (currentCalendarMonth === 11) {
+    currentCalendarMonth = 0;
+    currentCalendarYear++;
+  } else {
+    currentCalendarMonth++;
+  }
+  updateCalendarSelectors();
+  renderCalendarView();
+  updateMonthSummary();
+  updateURLState();
+  saveCalendarState();
+}
+
+function updateURLState() {
+  const url = new URL(window.location);
+  url.searchParams.set('year', currentCalendarYear);
+  url.searchParams.set('month', currentCalendarMonth);
+  
+  const state = {
+    year: currentCalendarYear,
+    month: currentCalendarMonth
+  };
+  
+  window.history.replaceState(state, '', url);
+}
+
+function loadCalendarStateFromURL() {
+  const url = new URL(window.location);
+  const year = url.searchParams.get('year');
+  const month = url.searchParams.get('month');
+  
+  if (year && month !== null) {
+    currentCalendarYear = parseInt(year);
+    currentCalendarMonth = parseInt(month);
+    updateCalendarSelectors();
+    renderCalendarView();
+    updateMonthSummary();
+  }
+}
+
+function saveCalendarState() {
+  // Skip localStorage for this demo
+  return;
+}
+
+function exportMonthData() {
+  const monthData = getMonthData();
+  const monthName = new Date(currentCalendarYear, currentCalendarMonth).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' });
+  
+  // Create CSV content
+  let csvContent = `${monthName} 휴가·휴직 현황\n\n`;
+  
+  // Summary
+  csvContent += "월별 요약\n";
+  csvContent += `총 휴가일수,${monthData.totalDays}일\n`;
+  csvContent += `승인대기,${monthData.pendingCount}건\n`;
+  csvContent += `승인완료,${monthData.approvedCount}건\n`;
+  csvContent += `반려,${monthData.rejectedCount}건\n\n`;
+  
+  // Leave applications
+  csvContent += "휴가 신청 내역\n";
+  csvContent += "신청자,휴가종류,시작일,종료일,일수,사유,상태\n";
+  
+  monthData.leaves.forEach(leave => {
+    csvContent += `${leave.teacherName},${leave.type},${leave.startDate},${leave.endDate},${leave.days},${leave.reason},${leave.status}\n`;
+  });
+  
+  // Absence applications
+  if (monthData.absences.length > 0) {
+    csvContent += "\n휴직 신청 내역\n";
+    csvContent += "신청자,휴직종류,시작일,종료일,사유,상태\n";
+    
+    monthData.absences.forEach(absence => {
+      csvContent += `${absence.teacherName},${absence.type},${absence.startDate},${absence.endDate},${absence.reason},${absence.status}\n`;
+    });
+  }
+  
+  // Create and download file
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', `${monthName.replace(/\s/g, '_')}_휴가휴직현황.csv`);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  
+  showToast(`${monthName} 데이터를 내보냈습니다.`, 'success');
+}
+
+function getMonthData() {
+  const startOfMonth = new Date(currentCalendarYear, currentCalendarMonth, 1);
+  const endOfMonth = new Date(currentCalendarYear, currentCalendarMonth + 1, 0);
+  
+  const monthLeaves = appData.leaveApplications.filter(leave => {
+    const leaveStart = new Date(leave.startDate);
+    const leaveEnd = new Date(leave.endDate);
+    return (leaveStart <= endOfMonth && leaveEnd >= startOfMonth);
+  });
+  
+  const monthAbsences = appData.leaveOfAbsenceApplications.filter(absence => {
+    const absenceStart = new Date(absence.startDate);
+    const absenceEnd = new Date(absence.endDate);
+    return (absenceStart <= endOfMonth && absenceEnd >= startOfMonth);
+  });
+  
+  const totalDays = monthLeaves
+    .filter(leave => leave.status === '승인')
+    .reduce((sum, leave) => sum + leave.days, 0);
+  
+  const pendingCount = monthLeaves.filter(leave => leave.status === '승인대기').length +
+                      monthAbsences.filter(absence => absence.status === '승인대기').length;
+  
+  const approvedCount = monthLeaves.filter(leave => leave.status === '승인').length +
+                        monthAbsences.filter(absence => absence.status === '승인').length;
+  
+  const rejectedCount = monthLeaves.filter(leave => leave.status === '반려').length +
+                        monthAbsences.filter(absence => absence.status === '반려').length;
+  
+  return {
+    leaves: monthLeaves,
+    absences: monthAbsences,
+    totalDays,
+    pendingCount,
+    approvedCount,
+    rejectedCount
+  };
 }
 
 function populateFilters() {
@@ -381,6 +701,7 @@ function renderDashboard() {
   updateSummaryCards();
   renderPendingApprovals();
   renderCalendarView();
+  updateMonthSummary();
 }
 
 function updateSummaryCards() {
@@ -406,11 +727,16 @@ function isCurrentlyOnLeave(startDate, endDate) {
 
 function renderPendingApprovals() {
   const pendingList = document.getElementById('pendingList');
+  const pendingCount = document.getElementById('pendingCount');
   if (!pendingList) return;
   
   const pendingLeaves = appData.leaveApplications.filter(app => app.status === '승인대기');
   const pendingAbsences = appData.leaveOfAbsenceApplications.filter(app => app.status === '승인대기');
   const allPending = [...pendingLeaves, ...pendingAbsences];
+  
+  if (pendingCount) {
+    pendingCount.textContent = allPending.length;
+  }
   
   if (allPending.length === 0) {
     pendingList.innerHTML = `
@@ -452,52 +778,165 @@ function renderCalendarView() {
   const calendarView = document.getElementById('calendarView');
   if (!calendarView) return;
   
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth();
-  
-  const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
+  const firstDay = new Date(currentCalendarYear, currentCalendarMonth, 1);
+  const lastDay = new Date(currentCalendarYear, currentCalendarMonth + 1, 0);
   const daysInMonth = lastDay.getDate();
   const startDayOfWeek = firstDay.getDay();
   
+  const today = new Date();
+  const isCurrentMonth = today.getFullYear() === currentCalendarYear && today.getMonth() === currentCalendarMonth;
+  
   const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
-  let calendarHTML = weekdays.map(day => 
-    `<div class="calendar-day calendar-day--header">${day}</div>`
+  let calendarHTML = weekdays.map((day, index) => 
+    `<div class="calendar-day calendar-day--header ${index === 0 || index === 6 ? 'calendar-day--weekend' : ''}">${day}</div>`
   ).join('');
   
-  for (let i = 0; i < startDayOfWeek; i++) {
-    calendarHTML += '<div class="calendar-day"></div>';
+  // Previous month days
+  const prevMonth = new Date(currentCalendarYear, currentCalendarMonth - 1, 0);
+  for (let i = startDayOfWeek - 1; i >= 0; i--) {
+    const day = prevMonth.getDate() - i;
+    calendarHTML += `<div class="calendar-day calendar-day--other-month">${day}</div>`;
   }
   
+  // Current month days
   for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(year, month, day);
+    const date = new Date(currentCalendarYear, currentCalendarMonth, day);
     const dateStr = date.toISOString().split('T')[0];
+    const dayOfWeek = date.getDay();
     
     let dayClass = 'calendar-day';
-    const isToday = date.toDateString() === today.toDateString();
+    const isToday = isCurrentMonth && date.getDate() === today.getDate();
     
     if (isToday) {
       dayClass += ' calendar-day--today';
     }
     
-    const hasLeave = appData.leaveApplications.some(app => 
-      app.status === '승인' && dateStr >= app.startDate && dateStr <= app.endDate
-    );
-    const hasAbsence = appData.leaveOfAbsenceApplications.some(app => 
-      app.status === '승인' && dateStr >= app.startDate && dateStr <= app.endDate
-    );
-    
-    if (hasAbsence) {
-      dayClass += ' calendar-day--absence';
-    } else if (hasLeave) {
-      dayClass += ' calendar-day--leave';
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+      dayClass += ' calendar-day--weekend';
     }
     
-    calendarHTML += `<div class="${dayClass}">${day}</div>`;
+    // Get events for this day
+    const dayEvents = getDayEvents(dateStr);
+    const eventsHTML = dayEvents.map(event => 
+      `<div class="calendar-event calendar-event--${event.type}"></div>`
+    ).join('');
+    
+    calendarHTML += `
+      <div class="${dayClass}" onclick="showDayDetail('${dateStr}')">
+        <span class="calendar-day-number">${day}</span>
+        <div class="calendar-day-events">${eventsHTML}</div>
+      </div>
+    `;
+  }
+  
+  // Next month days to fill the grid
+  const totalCells = Math.ceil((startDayOfWeek + daysInMonth) / 7) * 7;
+  const remainingCells = totalCells - (startDayOfWeek + daysInMonth);
+  for (let day = 1; day <= remainingCells; day++) {
+    calendarHTML += `<div class="calendar-day calendar-day--other-month">${day}</div>`;
   }
   
   calendarView.innerHTML = calendarHTML;
+}
+
+function getDayEvents(dateStr) {
+  const events = [];
+  
+  // Check leave applications
+  appData.leaveApplications.forEach(leave => {
+    if (leave.status === '승인' && dateStr >= leave.startDate && dateStr <= leave.endDate) {
+      events.push({
+        type: `leave-${leave.type}`,
+        data: leave
+      });
+    }
+  });
+  
+  // Check absence applications
+  appData.leaveOfAbsenceApplications.forEach(absence => {
+    if (absence.status === '승인' && dateStr >= absence.startDate && dateStr <= absence.endDate) {
+      events.push({
+        type: 'absence',
+        data: absence
+      });
+    }
+  });
+  
+  return events;
+}
+
+function showDayDetail(dateStr) {
+  const date = new Date(dateStr);
+  const events = getDayEvents(dateStr);
+  
+  if (events.length === 0) {
+    showToast('해당 날짜에 일정이 없습니다.', 'info');
+    return;
+  }
+  
+  const title = `${date.toLocaleDateString('ko-KR', { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric',
+    weekday: 'long'
+  })} 일정`;
+  
+  const eventsHTML = events.map(event => {
+    const isLeave = event.type.startsWith('leave-');
+    const data = event.data;
+    
+    return `
+      <div class="day-event-item day-event-item--${isLeave ? 'leave' : 'absence'}">
+        <div class="day-event-header">
+          <span class="day-event-teacher">${data.teacherName}</span>
+          <span class="status-badge ${getStatusBadgeClass(data.status)}">${data.type}</span>
+        </div>
+        <div class="day-event-type">${isLeave ? `${data.days}일간` : ''} ${data.type}</div>
+        <div class="day-event-reason">${data.reason}</div>
+      </div>
+    `;
+  }).join('');
+  
+  const modalBody = `
+    <div class="day-events-list">
+      ${eventsHTML}
+    </div>
+  `;
+  
+  openDayDetailModal(title, modalBody);
+}
+
+function openDayDetailModal(title, body) {
+  const modal = document.getElementById('dayDetailModal');
+  const modalTitle = document.getElementById('dayDetailTitle');
+  const modalBody = document.getElementById('dayDetailBody');
+  
+  if (modal && modalTitle && modalBody) {
+    modalTitle.textContent = title;
+    modalBody.innerHTML = body;
+    modal.classList.remove('hidden');
+  }
+}
+
+function closeDayDetailModal() {
+  const modal = document.getElementById('dayDetailModal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+}
+
+function updateMonthSummary() {
+  const monthData = getMonthData();
+  
+  const totalDaysEl = document.getElementById('monthTotalDays');
+  const pendingCountEl = document.getElementById('monthPendingCount');
+  const approvedCountEl = document.getElementById('monthApprovedCount');
+  const rejectedCountEl = document.getElementById('monthRejectedCount');
+  
+  if (totalDaysEl) totalDaysEl.textContent = `${monthData.totalDays}일`;
+  if (pendingCountEl) pendingCountEl.textContent = `${monthData.pendingCount}건`;
+  if (approvedCountEl) approvedCountEl.textContent = `${monthData.approvedCount}건`;
+  if (rejectedCountEl) rejectedCountEl.textContent = `${monthData.rejectedCount}건`;
 }
 
 // Table rendering functions
@@ -710,1036 +1149,6 @@ function filterContracts() {
   renderContractTable(filtered);
 }
 
-// CRUD Functions - Teachers
-function openTeacherForm(teacherId = null) {
-  const isEdit = teacherId !== null;
-  const teacher = isEdit ? appData.teachers.find(t => t.id === teacherId) : null;
-  
-  const title = isEdit ? '교원 정보 수정' : '신규 교원 등록';
-  const submitText = isEdit ? '수정' : '등록';
-  
-  const modalBody = `
-    <form id="teacherForm" onsubmit="saveTeacher(event, ${teacherId})">
-      <div class="form-section">
-        <div class="form-section-title">기본 정보</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label" for="teacherName">성명 *</label>
-            <input type="text" id="teacherName" class="form-control" value="${teacher?.name || ''}" required>
-            <div class="form-error" id="teacherNameError"></div>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="teacherEmail">이메일 *</label>
-            <input type="email" id="teacherEmail" class="form-control" value="${teacher?.email || ''}" required>
-            <div class="form-error" id="teacherEmailError"></div>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="teacherPhone">연락처 *</label>
-            <input type="tel" id="teacherPhone" class="form-control" value="${teacher?.phone || ''}" required>
-            <div class="form-error" id="teacherPhoneError"></div>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="teacherHireDate">입사일 *</label>
-            <input type="date" id="teacherHireDate" class="form-control" value="${teacher?.hireDate || ''}" required>
-            <div class="form-error" id="teacherHireDateError"></div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="form-section">
-        <div class="form-section-title">직무 정보</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label" for="teacherSubject">담당과목 *</label>
-            <select id="teacherSubject" class="form-control" required>
-              <option value="">과목 선택</option>
-              ${config.subjects.map(subject => 
-                `<option value="${subject}" ${teacher?.subject === subject ? 'selected' : ''}>${subject}</option>`
-              ).join('')}
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="teacherDepartment">부서 *</label>
-            <select id="teacherDepartment" class="form-control" required>
-              <option value="">부서 선택</option>
-              ${config.departments.map(dept => 
-                `<option value="${dept}" ${teacher?.department === dept ? 'selected' : ''}>${dept}</option>`
-              ).join('')}
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="teacherPosition">직급 *</label>
-            <select id="teacherPosition" class="form-control" required>
-              <option value="">직급 선택</option>
-              ${config.positions.map(pos => 
-                `<option value="${pos}" ${teacher?.position === pos ? 'selected' : ''}>${pos}</option>`
-              ).join('')}
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="teacherYearsOfService">재직연수</label>
-            <input type="number" id="teacherYearsOfService" class="form-control" min="0" max="40" 
-                   value="${teacher?.yearsOfService || ''}" readonly>
-            <div class="form-help">입사일을 기준으로 자동 계산됩니다</div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="modal-actions">
-        <button type="button" class="btn btn--secondary" onclick="closeModal()">취소</button>
-        <button type="submit" class="btn btn--primary">${submitText}</button>
-      </div>
-    </form>
-  `;
-  
-  openModal(title, modalBody);
-  
-  // Auto-calculate years of service when hire date changes
-  document.getElementById('teacherHireDate').addEventListener('change', function() {
-    const hireDate = new Date(this.value);
-    const now = new Date();
-    const years = Math.floor((now - hireDate) / (365.25 * 24 * 60 * 60 * 1000));
-    document.getElementById('teacherYearsOfService').value = Math.max(0, years);
-  });
-  
-  // Trigger initial calculation if editing
-  if (teacher?.hireDate) {
-    document.getElementById('teacherHireDate').dispatchEvent(new Event('change'));
-  }
-}
-
-function saveTeacher(event, teacherId = null) {
-  event.preventDefault();
-  
-  const formData = {
-    name: document.getElementById('teacherName').value.trim(),
-    email: document.getElementById('teacherEmail').value.trim(),
-    phone: document.getElementById('teacherPhone').value.trim(),
-    hireDate: document.getElementById('teacherHireDate').value,
-    subject: document.getElementById('teacherSubject').value,
-    department: document.getElementById('teacherDepartment').value,
-    position: document.getElementById('teacherPosition').value,
-    yearsOfService: parseInt(document.getElementById('teacherYearsOfService').value) || 0
-  };
-  
-  // Validate form
-  if (!validateTeacherForm(formData)) {
-    return;
-  }
-  
-  if (teacherId) {
-    // Update existing teacher
-    const teacher = appData.teachers.find(t => t.id === teacherId);
-    if (teacher) {
-      Object.assign(teacher, formData);
-      // Recalculate leave days based on years of service
-      teacher.annualLeaveDays = calculateAnnualLeaveDays(teacher.yearsOfService);
-      teacher.remainingLeaveDays = teacher.annualLeaveDays - teacher.usedLeaveDays;
-      
-      showToast('교원 정보가 수정되었습니다.', 'success');
-    }
-  } else {
-    // Add new teacher
-    const newTeacher = {
-      id: nextId.teachers++,
-      ...formData,
-      annualLeaveDays: calculateAnnualLeaveDays(formData.yearsOfService),
-      usedLeaveDays: 0,
-      remainingLeaveDays: calculateAnnualLeaveDays(formData.yearsOfService),
-      status: '재직'
-    };
-    
-    appData.teachers.push(newTeacher);
-    showToast('새 교원이 등록되었습니다.', 'success');
-  }
-  
-  closeModal();
-  renderTeachersTable();
-  filterTeachers(); // Apply current filters
-  updateSummaryCards();
-}
-
-function validateTeacherForm(data) {
-  let isValid = true;
-  
-  // Reset errors
-  document.querySelectorAll('.form-error').forEach(error => {
-    error.classList.remove('show');
-    error.textContent = '';
-  });
-  
-  document.querySelectorAll('.form-control').forEach(control => {
-    control.classList.remove('error');
-  });
-  
-  // Validate name
-  if (!data.name) {
-    showFieldError('teacherName', '성명을 입력해주세요.');
-    isValid = false;
-  } else if (data.name.length < 2) {
-    showFieldError('teacherName', '성명은 2자 이상이어야 합니다.');
-    isValid = false;
-  }
-  
-  // Validate email
-  if (!data.email) {
-    showFieldError('teacherEmail', '이메일을 입력해주세요.');
-    isValid = false;
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-    showFieldError('teacherEmail', '올바른 이메일 형식이 아닙니다.');
-    isValid = false;
-  }
-  
-  // Validate phone
-  if (!data.phone) {
-    showFieldError('teacherPhone', '연락처를 입력해주세요.');
-    isValid = false;
-  } else if (!/^010-\d{4}-\d{4}$/.test(data.phone)) {
-    showFieldError('teacherPhone', '010-0000-0000 형식으로 입력해주세요.');
-    isValid = false;
-  }
-  
-  // Validate hire date
-  if (!data.hireDate) {
-    showFieldError('teacherHireDate', '입사일을 입력해주세요.');
-    isValid = false;
-  }
-  
-  return isValid;
-}
-
-function calculateAnnualLeaveDays(yearsOfService) {
-  if (yearsOfService >= 20) return 25;
-  if (yearsOfService >= 10) return 24;
-  if (yearsOfService >= 5) return 22;
-  if (yearsOfService >= 3) return 20;
-  return 15;
-}
-
-function editTeacher(teacherId) {
-  openTeacherForm(teacherId);
-}
-
-function deleteTeacher(teacherId) {
-  const teacher = appData.teachers.find(t => t.id === teacherId);
-  if (!teacher) return;
-  
-  showConfirmDialog(
-    `${teacher.name} 교원을 정말 삭제하시겠습니까?`,
-    () => {
-      appData.teachers = appData.teachers.filter(t => t.id !== teacherId);
-      
-      // Remove related leave applications
-      appData.leaveApplications = appData.leaveApplications.filter(app => app.teacherId !== teacherId);
-      appData.leaveOfAbsenceApplications = appData.leaveOfAbsenceApplications.filter(app => app.teacherId !== teacherId);
-      
-      renderTeachersTable();
-      filterTeachers();
-      updateSummaryCards();
-      showToast('교원이 삭제되었습니다.', 'success');
-    }
-  );
-}
-
-function viewTeacher(teacherId) {
-  const teacher = appData.teachers.find(t => t.id === teacherId);
-  if (!teacher) return;
-  
-  const leaveHistory = appData.leaveApplications.filter(app => app.teacherId === teacherId);
-  const absenceHistory = appData.leaveOfAbsenceApplications.filter(app => app.teacherId === teacherId);
-  
-  const modalBody = `
-    <div class="detail-grid">
-      <div class="detail-row">
-        <span class="detail-label">성명</span>
-        <span class="detail-value">${teacher.name}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">이메일</span>
-        <span class="detail-value">${teacher.email}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">연락처</span>
-        <span class="detail-value">${teacher.phone}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">담당과목</span>
-        <span class="detail-value">${teacher.subject}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">부서</span>
-        <span class="detail-value">${teacher.department}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">직급</span>
-        <span class="detail-value">${teacher.position}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">입사일</span>
-        <span class="detail-value">${formatDate(teacher.hireDate)}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">재직연수</span>
-        <span class="detail-value">${teacher.yearsOfService}년</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">연가일수</span>
-        <span class="detail-value">${teacher.annualLeaveDays}일</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">사용연가</span>
-        <span class="detail-value">${teacher.usedLeaveDays}일</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">잔여연가</span>
-        <span class="detail-value">${teacher.remainingLeaveDays}일</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">현재 상태</span>
-        <span class="detail-value">
-          <span class="status-badge ${getStatusBadgeClass(teacher.status)}">
-            ${teacher.status}
-          </span>
-        </span>
-      </div>
-    </div>
-    
-    ${leaveHistory.length > 0 || absenceHistory.length > 0 ? `
-      <div class="leave-history">
-        <h4>휴가/휴직 이력</h4>
-        ${leaveHistory.map(leave => `
-          <div class="history-item">
-            <div class="history-header">
-              <span class="history-type">${leave.type}</span>
-              <span class="status-badge ${getStatusBadgeClass(leave.status)}">${leave.status}</span>
-            </div>
-            <div class="history-period">${formatDateRange(leave.startDate, leave.endDate)} (${leave.days}일)</div>
-            <div class="history-reason">${leave.reason}</div>
-          </div>
-        `).join('')}
-        ${absenceHistory.map(absence => `
-          <div class="history-item">
-            <div class="history-header">
-              <span class="history-type">${absence.type}</span>
-              <span class="status-badge ${getStatusBadgeClass(absence.status)}">${absence.status}</span>
-            </div>
-            <div class="history-period">${formatDateRange(absence.startDate, absence.endDate)}</div>
-            <div class="history-reason">${absence.reason}</div>
-          </div>
-        `).join('')}
-      </div>
-    ` : ''}
-  `;
-  
-  openModal(`${teacher.name} 교원 상세 정보`, modalBody);
-}
-
-// CRUD Functions - Leave Applications
-function openLeaveForm(leaveId = null) {
-  const isEdit = leaveId !== null;
-  const leave = isEdit ? appData.leaveApplications.find(l => l.id === leaveId) : null;
-  
-  const title = isEdit ? '휴가 신청 수정' : '새 휴가 신청';
-  const submitText = isEdit ? '수정' : '신청';
-  
-  const modalBody = `
-    <form id="leaveForm" onsubmit="saveLeave(event, ${leaveId})">
-      <div class="form-section">
-        <div class="form-section-title">휴가 정보</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label" for="leaveTeacher">신청자 *</label>
-            <select id="leaveTeacher" class="form-control" required ${isEdit ? 'disabled' : ''}>
-              <option value="">교원 선택</option>
-              ${appData.teachers.filter(t => t.status === '재직').map(teacher => 
-                `<option value="${teacher.id}" ${leave?.teacherId === teacher.id ? 'selected' : ''}>${teacher.name} (${teacher.department})</option>`
-              ).join('')}
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="leaveType">휴가 종류 *</label>
-            <select id="leaveType" class="form-control" required>
-              <option value="">휴가 종류 선택</option>
-              ${Object.keys(config.leaveTypes).map(type => 
-                `<option value="${type}" ${leave?.type === type ? 'selected' : ''}>${type}</option>`
-              ).join('')}
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="leaveStartDate">시작일 *</label>
-            <input type="date" id="leaveStartDate" class="form-control" value="${leave?.startDate || ''}" required>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="leaveEndDate">종료일 *</label>
-            <input type="date" id="leaveEndDate" class="form-control" value="${leave?.endDate || ''}" required>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="leaveDays">휴가일수</label>
-            <input type="number" id="leaveDays" class="form-control" value="${leave?.days || ''}" readonly>
-            <div class="form-help">날짜 선택시 자동 계산됩니다</div>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="leaveReason">사유 *</label>
-            <textarea id="leaveReason" class="form-control" rows="3" required>${leave?.reason || ''}</textarea>
-          </div>
-        </div>
-      </div>
-      
-      <div class="modal-actions">
-        <button type="button" class="btn btn--secondary" onclick="closeModal()">취소</button>
-        <button type="submit" class="btn btn--primary">${submitText}</button>
-      </div>
-    </form>
-  `;
-  
-  openModal(title, modalBody);
-  
-  // Auto-calculate days when dates change
-  const startDateInput = document.getElementById('leaveStartDate');
-  const endDateInput = document.getElementById('leaveEndDate');
-  const daysInput = document.getElementById('leaveDays');
-  
-  function calculateDays() {
-    const startDate = new Date(startDateInput.value);
-    const endDate = new Date(endDateInput.value);
-    
-    if (startDate && endDate && startDate <= endDate) {
-      const diffTime = endDate - startDate;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-      daysInput.value = diffDays;
-    }
-  }
-  
-  startDateInput.addEventListener('change', calculateDays);
-  endDateInput.addEventListener('change', calculateDays);
-  
-  // Trigger initial calculation if editing
-  if (leave?.startDate && leave?.endDate) {
-    calculateDays();
-  }
-}
-
-function saveLeave(event, leaveId = null) {
-  event.preventDefault();
-  
-  const teacherId = parseInt(document.getElementById('leaveTeacher').value);
-  const teacher = appData.teachers.find(t => t.id === teacherId);
-  
-  const formData = {
-    teacherId: teacherId,
-    teacherName: teacher?.name || '',
-    type: document.getElementById('leaveType').value,
-    startDate: document.getElementById('leaveStartDate').value,
-    endDate: document.getElementById('leaveEndDate').value,
-    days: parseInt(document.getElementById('leaveDays').value) || 0,
-    reason: document.getElementById('leaveReason').value.trim()
-  };
-  
-  // Validate form
-  if (!validateLeaveForm(formData, teacher)) {
-    return;
-  }
-  
-  if (leaveId) {
-    // Update existing leave
-    const leave = appData.leaveApplications.find(l => l.id === leaveId);
-    if (leave) {
-      Object.assign(leave, formData);
-      showToast('휴가 신청이 수정되었습니다.', 'success');
-    }
-  } else {
-    // Add new leave
-    const newLeave = {
-      id: nextId.leaveApplications++,
-      ...formData,
-      status: '승인대기',
-      appliedDate: new Date().toISOString().split('T')[0],
-      approvedDate: null,
-      approver: null,
-      rejectReason: null
-    };
-    
-    appData.leaveApplications.push(newLeave);
-    showToast('휴가 신청이 접수되었습니다.', 'success');
-  }
-  
-  closeModal();
-  renderLeavesTable();
-  filterLeaves();
-  renderPendingApprovals();
-}
-
-function validateLeaveForm(data, teacher) {
-  let isValid = true;
-  
-  if (!data.teacherId) {
-    showToast('신청자를 선택해주세요.', 'error');
-    isValid = false;
-  }
-  
-  if (!data.type) {
-    showToast('휴가 종류를 선택해주세요.', 'error');
-    isValid = false;
-  }
-  
-  if (!data.startDate || !data.endDate) {
-    showToast('휴가 기간을 입력해주세요.', 'error');
-    isValid = false;
-  } else if (new Date(data.startDate) > new Date(data.endDate)) {
-    showToast('종료일이 시작일보다 빠를 수 없습니다.', 'error');
-    isValid = false;
-  }
-  
-  if (!data.reason) {
-    showToast('휴가 사유를 입력해주세요.', 'error');
-    isValid = false;
-  }
-  
-  // Check if teacher has enough remaining leave days
-  if (teacher && data.type === '연가' && data.days > teacher.remainingLeaveDays) {
-    showToast(`잔여 연가일수(${teacher.remainingLeaveDays}일)가 부족합니다.`, 'error');
-    isValid = false;
-  }
-  
-  // Check for overlapping leave periods
-  const hasOverlap = appData.leaveApplications.some(leave => 
-    leave.teacherId === data.teacherId &&
-    leave.status === '승인' &&
-    !(new Date(data.endDate) < new Date(leave.startDate) || new Date(data.startDate) > new Date(leave.endDate))
-  );
-  
-  if (hasOverlap) {
-    showToast('선택한 기간에 이미 승인된 휴가가 있습니다.', 'error');
-    isValid = false;
-  }
-  
-  return isValid;
-}
-
-function editLeave(leaveId) {
-  openLeaveForm(leaveId);
-}
-
-function deleteLeave(leaveId) {
-  const leave = appData.leaveApplications.find(l => l.id === leaveId);
-  if (!leave) return;
-  
-  if (leave.status !== '승인대기') {
-    showToast('승인대기 상태의 신청서만 삭제할 수 있습니다.', 'error');
-    return;
-  }
-  
-  showConfirmDialog(
-    `${leave.teacherName}의 ${leave.type} 신청을 삭제하시겠습니까?`,
-    () => {
-      appData.leaveApplications = appData.leaveApplications.filter(l => l.id !== leaveId);
-      renderLeavesTable();
-      filterLeaves();
-      renderPendingApprovals();
-      showToast('휴가 신청이 삭제되었습니다.', 'success');
-    }
-  );
-}
-
-function viewLeave(leaveId) {
-  const leave = appData.leaveApplications.find(l => l.id === leaveId);
-  if (!leave) return;
-  
-  const modalBody = `
-    <div class="detail-grid">
-      <div class="detail-row">
-        <span class="detail-label">신청자</span>
-        <span class="detail-value">${leave.teacherName}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">휴가종류</span>
-        <span class="detail-value">${leave.type}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">신청일</span>
-        <span class="detail-value">${formatDate(leave.appliedDate)}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">휴가기간</span>
-        <span class="detail-value">${formatDateRange(leave.startDate, leave.endDate)}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">휴가일수</span>
-        <span class="detail-value">${leave.days}일</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">사유</span>
-        <span class="detail-value">${leave.reason}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">상태</span>
-        <span class="detail-value">
-          <span class="status-badge ${getStatusBadgeClass(leave.status)}">${leave.status}</span>
-        </span>
-      </div>
-      ${leave.approvedDate ? `
-        <div class="detail-row">
-          <span class="detail-label">처리일</span>
-          <span class="detail-value">${formatDate(leave.approvedDate)}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">처리자</span>
-          <span class="detail-value">${leave.approver || '-'}</span>
-        </div>
-      ` : ''}
-      ${leave.rejectReason ? `
-        <div class="detail-row">
-          <span class="detail-label">반려사유</span>
-          <span class="detail-value">${leave.rejectReason}</span>
-        </div>
-      ` : ''}
-    </div>
-  `;
-  
-  openModal(`휴가 신청 상세`, modalBody);
-}
-
-// CRUD Functions - Absence Applications
-function openAbsenceForm(absenceId = null) {
-  const isEdit = absenceId !== null;
-  const absence = isEdit ? appData.leaveOfAbsenceApplications.find(a => a.id === absenceId) : null;
-  
-  const title = isEdit ? '휴직 신청 수정' : '새 휴직 신청';
-  const submitText = isEdit ? '수정' : '신청';
-  
-  const modalBody = `
-    <form id="absenceForm" onsubmit="saveAbsence(event, ${absenceId})">
-      <div class="form-section">
-        <div class="form-section-title">휴직 정보</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label" for="absenceTeacher">신청자 *</label>
-            <select id="absenceTeacher" class="form-control" required ${isEdit ? 'disabled' : ''}>
-              <option value="">교원 선택</option>
-              ${appData.teachers.filter(t => t.status === '재직').map(teacher => 
-                `<option value="${teacher.id}" ${absence?.teacherId === teacher.id ? 'selected' : ''}>${teacher.name} (${teacher.department})</option>`
-              ).join('')}
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="absenceType">휴직 종류 *</label>
-            <select id="absenceType" class="form-control" required>
-              <option value="">휴직 종류 선택</option>
-              ${Object.keys(config.absenceTypes).map(type => 
-                `<option value="${type}" ${absence?.type === type ? 'selected' : ''}>${type}</option>`
-              ).join('')}
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="absenceStartDate">시작일 *</label>
-            <input type="date" id="absenceStartDate" class="form-control" value="${absence?.startDate || ''}" required>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="absenceEndDate">종료일 *</label>
-            <input type="date" id="absenceEndDate" class="form-control" value="${absence?.endDate || ''}" required>
-          </div>
-          
-          <div class="form-group" style="grid-column: 1 / -1;">
-            <label class="form-label" for="absenceReason">사유 *</label>
-            <textarea id="absenceReason" class="form-control" rows="4" required>${absence?.reason || ''}</textarea>
-          </div>
-        </div>
-      </div>
-      
-      <div class="modal-actions">
-        <button type="button" class="btn btn--secondary" onclick="closeModal()">취소</button>
-        <button type="submit" class="btn btn--primary">${submitText}</button>
-      </div>
-    </form>
-  `;
-  
-  openModal(title, modalBody);
-}
-
-function saveAbsence(event, absenceId = null) {
-  event.preventDefault();
-  
-  const teacherId = parseInt(document.getElementById('absenceTeacher').value);
-  const teacher = appData.teachers.find(t => t.id === teacherId);
-  
-  const formData = {
-    teacherId: teacherId,
-    teacherName: teacher?.name || '',
-    type: document.getElementById('absenceType').value,
-    startDate: document.getElementById('absenceStartDate').value,
-    endDate: document.getElementById('absenceEndDate').value,
-    reason: document.getElementById('absenceReason').value.trim()
-  };
-  
-  // Basic validation
-  if (!formData.teacherId || !formData.type || !formData.startDate || !formData.endDate || !formData.reason) {
-    showToast('모든 필수 항목을 입력해주세요.', 'error');
-    return;
-  }
-  
-  if (new Date(formData.startDate) > new Date(formData.endDate)) {
-    showToast('종료일이 시작일보다 빠를 수 없습니다.', 'error');
-    return;
-  }
-  
-  if (absenceId) {
-    // Update existing absence
-    const absence = appData.leaveOfAbsenceApplications.find(a => a.id === absenceId);
-    if (absence) {
-      Object.assign(absence, formData);
-      showToast('휴직 신청이 수정되었습니다.', 'success');
-    }
-  } else {
-    // Add new absence
-    const newAbsence = {
-      id: nextId.leaveOfAbsenceApplications++,
-      ...formData,
-      status: '승인대기',
-      appliedDate: new Date().toISOString().split('T')[0],
-      approvedDate: null,
-      approver: null,
-      documents: []
-    };
-    
-    appData.leaveOfAbsenceApplications.push(newAbsence);
-    showToast('휴직 신청이 접수되었습니다.', 'success');
-  }
-  
-  closeModal();
-  renderAbsencesTable();
-  filterAbsences();
-  renderPendingApprovals();
-}
-
-function editAbsence(absenceId) {
-  openAbsenceForm(absenceId);
-}
-
-function deleteAbsence(absenceId) {
-  const absence = appData.leaveOfAbsenceApplications.find(a => a.id === absenceId);
-  if (!absence) return;
-  
-  if (absence.status !== '승인대기') {
-    showToast('승인대기 상태의 신청서만 삭제할 수 있습니다.', 'error');
-    return;
-  }
-  
-  showConfirmDialog(
-    `${absence.teacherName}의 ${absence.type} 신청을 삭제하시겠습니까?`,
-    () => {
-      appData.leaveOfAbsenceApplications = appData.leaveOfAbsenceApplications.filter(a => a.id !== absenceId);
-      renderAbsencesTable();
-      filterAbsences();
-      renderPendingApprovals();
-      showToast('휴직 신청이 삭제되었습니다.', 'success');
-    }
-  );
-}
-
-function viewAbsence(absenceId) {
-  const absence = appData.leaveOfAbsenceApplications.find(a => a.id === absenceId);
-  if (!absence) return;
-  
-  const modalBody = `
-    <div class="detail-grid">
-      <div class="detail-row">
-        <span class="detail-label">신청자</span>
-        <span class="detail-value">${absence.teacherName}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">휴직종류</span>
-        <span class="detail-value">${absence.type}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">신청일</span>
-        <span class="detail-value">${formatDate(absence.appliedDate)}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">휴직기간</span>
-        <span class="detail-value">${formatDateRange(absence.startDate, absence.endDate)}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">사유</span>
-        <span class="detail-value">${absence.reason}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">상태</span>
-        <span class="detail-value">
-          <span class="status-badge ${getStatusBadgeClass(absence.status)}">${absence.status}</span>
-        </span>
-      </div>
-      ${absence.approvedDate ? `
-        <div class="detail-row">
-          <span class="detail-label">처리일</span>
-          <span class="detail-value">${formatDate(absence.approvedDate)}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">처리자</span>
-          <span class="detail-value">${absence.approver || '-'}</span>
-        </div>
-      ` : ''}
-      ${absence.documents && absence.documents.length > 0 ? `
-        <div class="detail-row">
-          <span class="detail-label">첨부서류</span>
-          <span class="detail-value">${absence.documents.join(', ')}</span>
-        </div>
-      ` : ''}
-    </div>
-  `;
-  
-  openModal(`휴직 신청 상세`, modalBody);
-}
-
-// CRUD Functions - Contract Teachers
-function openContractForm(contractId = null) {
-  const isEdit = contractId !== null;
-  const contract = isEdit ? appData.contractTeachers.find(c => c.id === contractId) : null;
-  
-  const title = isEdit ? '기간제교원 정보 수정' : '기간제교원 등록';
-  const submitText = isEdit ? '수정' : '등록';
-  
-  const modalBody = `
-    <form id="contractForm" onsubmit="saveContract(event, ${contractId})">
-      <div class="form-section">
-        <div class="form-section-title">기본 정보</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label" for="contractName">성명 *</label>
-            <input type="text" id="contractName" class="form-control" value="${contract?.name || ''}" required>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="contractEmail">이메일 *</label>
-            <input type="email" id="contractEmail" class="form-control" value="${contract?.email || ''}" required>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="contractPhone">연락처 *</label>
-            <input type="tel" id="contractPhone" class="form-control" value="${contract?.phone || ''}" required>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="contractSubject">담당과목 *</label>
-            <select id="contractSubject" class="form-control" required>
-              <option value="">과목 선택</option>
-              ${config.subjects.map(subject => 
-                `<option value="${subject}" ${contract?.subject === subject ? 'selected' : ''}>${subject}</option>`
-              ).join('')}
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="contractQualification">자격사항</label>
-            <input type="text" id="contractQualification" class="form-control" value="${contract?.qualification || ''}">
-          </div>
-        </div>
-      </div>
-      
-      <div class="form-section">
-        <div class="form-section-title">계약 정보</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label" for="contractReason">임용사유 *</label>
-            <select id="contractReason" class="form-control" required>
-              <option value="">임용사유 선택</option>
-              <option value="육아휴직 대체" ${contract?.contractReason === '육아휴직 대체' ? 'selected' : ''}>육아휴직 대체</option>
-              <option value="질병휴직 대체" ${contract?.contractReason === '질병휴직 대체' ? 'selected' : ''}>질병휴직 대체</option>
-              <option value="특정교과담당" ${contract?.contractReason === '특정교과담당' ? 'selected' : ''}>특정교과담당</option>
-              <option value="결원보충" ${contract?.contractReason === '결원보충' ? 'selected' : ''}>결원보충</option>
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="contractReplacingTeacher">대체교원</label>
-            <select id="contractReplacingTeacher" class="form-control">
-              <option value="">해당없음</option>
-              ${appData.teachers.filter(t => t.status !== '재직').map(teacher => 
-                `<option value="${teacher.name}" ${contract?.replacingTeacher === teacher.name ? 'selected' : ''}>${teacher.name}</option>`
-              ).join('')}
-            </select>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="contractStartDate">계약시작일 *</label>
-            <input type="date" id="contractStartDate" class="form-control" value="${contract?.contractStart || ''}" required>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label" for="contractEndDate">계약종료일 *</label>
-            <input type="date" id="contractEndDate" class="form-control" value="${contract?.contractEnd || ''}" required>
-          </div>
-        </div>
-      </div>
-      
-      <div class="modal-actions">
-        <button type="button" class="btn btn--secondary" onclick="closeModal()">취소</button>
-        <button type="submit" class="btn btn--primary">${submitText}</button>
-      </div>
-    </form>
-  `;
-  
-  openModal(title, modalBody);
-}
-
-function saveContract(event, contractId = null) {
-  event.preventDefault();
-  
-  const formData = {
-    name: document.getElementById('contractName').value.trim(),
-    email: document.getElementById('contractEmail').value.trim(),
-    phone: document.getElementById('contractPhone').value.trim(),
-    subject: document.getElementById('contractSubject').value,
-    qualification: document.getElementById('contractQualification').value.trim(),
-    contractReason: document.getElementById('contractReason').value,
-    replacingTeacher: document.getElementById('contractReplacingTeacher').value,
-    contractStart: document.getElementById('contractStartDate').value,
-    contractEnd: document.getElementById('contractEndDate').value
-  };
-  
-  // Basic validation
-  if (!formData.name || !formData.email || !formData.phone || !formData.subject || !formData.contractReason || !formData.contractStart || !formData.contractEnd) {
-    showToast('필수 항목을 모두 입력해주세요.', 'error');
-    return;
-  }
-  
-  if (new Date(formData.contractStart) > new Date(formData.contractEnd)) {
-    showToast('계약종료일이 시작일보다 빠를 수 없습니다.', 'error');
-    return;
-  }
-  
-  if (contractId) {
-    // Update existing contract
-    const contract = appData.contractTeachers.find(c => c.id === contractId);
-    if (contract) {
-      Object.assign(contract, formData);
-      // Update status based on end date
-      const endDate = new Date(formData.contractEnd);
-      const today = new Date();
-      const daysUntilEnd = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
-      
-      if (daysUntilEnd < 0) {
-        contract.status = '계약종료';
-      } else if (daysUntilEnd <= 30) {
-        contract.status = '계약만료예정';
-      } else {
-        contract.status = '재직중';
-      }
-      
-      showToast('기간제교원 정보가 수정되었습니다.', 'success');
-    }
-  } else {
-    // Add new contract
-    const endDate = new Date(formData.contractEnd);
-    const today = new Date();
-    const daysUntilEnd = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
-    
-    let status = '재직중';
-    if (daysUntilEnd < 0) {
-      status = '계약종료';
-    } else if (daysUntilEnd <= 30) {
-      status = '계약만료예정';
-    }
-    
-    const newContract = {
-      id: nextId.contractTeachers++,
-      ...formData,
-      status: status
-    };
-    
-    appData.contractTeachers.push(newContract);
-    showToast('기간제교원이 등록되었습니다.', 'success');
-  }
-  
-  closeModal();
-  renderContractTable();
-  filterContracts();
-  updateSummaryCards();
-}
-
-function editContract(contractId) {
-  openContractForm(contractId);
-}
-
-function deleteContract(contractId) {
-  const contract = appData.contractTeachers.find(c => c.id === contractId);
-  if (!contract) return;
-  
-  showConfirmDialog(
-    `${contract.name} 기간제교원을 삭제하시겠습니까?`,
-    () => {
-      appData.contractTeachers = appData.contractTeachers.filter(c => c.id !== contractId);
-      renderContractTable();
-      filterContracts();
-      updateSummaryCards();
-      showToast('기간제교원이 삭제되었습니다.', 'success');
-    }
-  );
-}
-
-function viewContract(contractId) {
-  const contract = appData.contractTeachers.find(c => c.id === contractId);
-  if (!contract) return;
-  
-  const modalBody = `
-    <div class="detail-grid">
-      <div class="detail-row">
-        <span class="detail-label">성명</span>
-        <span class="detail-value">${contract.name}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">이메일</span>
-        <span class="detail-value">${contract.email}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">연락처</span>
-        <span class="detail-value">${contract.phone}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">담당과목</span>
-        <span class="detail-value">${contract.subject}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">자격사항</span>
-        <span class="detail-value">${contract.qualification || '-'}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">임용사유</span>
-        <span class="detail-value">${contract.contractReason}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">대체교원</span>
-        <span class="detail-value">${contract.replacingTeacher || '-'}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">계약기간</span>
-        <span class="detail-value">${formatDateRange(contract.contractStart, contract.contractEnd)}</span>
-      </div>
-      <div class="detail-row">
-        <span class="detail-label">현재상태</span>
-        <span class="detail-value">
-          <span class="status-badge ${getStatusBadgeClass(contract.status)}">${contract.status}</span>
-        </span>
-      </div>
-    </div>
-  `;
-  
-  openModal(`${contract.name} 기간제교원 상세`, modalBody);
-}
-
 // Application approval/rejection functions
 function approveApplication(id, type) {
   if (type === 'leave') {
@@ -1779,6 +1188,7 @@ function approveApplication(id, type) {
   updateSummaryCards();
   renderPendingApprovals();
   renderCalendarView();
+  updateMonthSummary();
   renderLeavesTable();
   renderAbsencesTable();
   renderTeachersTable();
@@ -2073,17 +1483,6 @@ function showToast(message, type = 'info') {
   }, 5000);
 }
 
-function showFieldError(fieldId, message) {
-  const field = document.getElementById(fieldId);
-  const error = document.getElementById(fieldId + 'Error');
-  
-  if (field && error) {
-    field.classList.add('error');
-    error.textContent = message;
-    error.classList.add('show');
-  }
-}
-
 function formatDate(dateString) {
   const date = new Date(dateString);
   return date.toLocaleDateString('ko-KR');
@@ -2118,25 +1517,92 @@ function getStatusBadgeClass(status) {
   }
 }
 
+// Mock CRUD functions (keeping existing implementations)
+function openTeacherForm() {
+  showToast('교원 등록 기능은 구현 예정입니다.', 'info');
+}
+
+function editTeacher(id) {
+  showToast(`교원 ${id} 수정 기능은 구현 예정입니다.`, 'info');
+}
+
+function deleteTeacher(id) {
+  showToast(`교원 ${id} 삭제 기능은 구현 예정입니다.`, 'info');
+}
+
+function viewTeacher(id) {
+  showToast(`교원 ${id} 상세 보기 기능은 구현 예정입니다.`, 'info');
+}
+
+function openLeaveForm() {
+  showToast('휴가 신청 기능은 구현 예정입니다.', 'info');
+}
+
+function editLeave(id) {
+  showToast(`휴가 ${id} 수정 기능은 구현 예정입니다.`, 'info');
+}
+
+function deleteLeave(id) {
+  showToast(`휴가 ${id} 삭제 기능은 구현 예정입니다.`, 'info');
+}
+
+function viewLeave(id) {
+  showToast(`휴가 ${id} 상세 보기 기능은 구현 예정입니다.`, 'info');
+}
+
+function openAbsenceForm() {
+  showToast('휴직 신청 기능은 구현 예정입니다.', 'info');
+}
+
+function editAbsence(id) {
+  showToast(`휴직 ${id} 수정 기능은 구현 예정입니다.`, 'info');
+}
+
+function deleteAbsence(id) {
+  showToast(`휴직 ${id} 삭제 기능은 구현 예정입니다.`, 'info');
+}
+
+function viewAbsence(id) {
+  showToast(`휴직 ${id} 상세 보기 기능은 구현 예정입니다.`, 'info');
+}
+
+function openContractForm() {
+  showToast('기간제교원 등록 기능은 구현 예정입니다.', 'info');
+}
+
+function editContract(id) {
+  showToast(`기간제교원 ${id} 수정 기능은 구현 예정입니다.`, 'info');
+}
+
+function deleteContract(id) {
+  showToast(`기간제교원 ${id} 삭제 기능은 구현 예정입니다.`, 'info');
+}
+
+function viewContract(id) {
+  showToast(`기간제교원 ${id} 상세 보기 기능은 구현 예정입니다.`, 'info');
+}
+
 // Make functions available globally
 window.switchTab = switchTab;
+window.goToToday = goToToday;
+window.goToPreviousMonth = goToPreviousMonth;
+window.goToNextMonth = goToNextMonth;
+window.showDayDetail = showDayDetail;
+window.closeDayDetailModal = closeDayDetailModal;
+window.exportMonthData = exportMonthData;
 window.openTeacherForm = openTeacherForm;
-window.saveTeacher = saveTeacher;
 window.editTeacher = editTeacher;
 window.deleteTeacher = deleteTeacher;
 window.viewTeacher = viewTeacher;
 window.openLeaveForm = openLeaveForm;
-window.saveLeave = saveLeave;
 window.editLeave = editLeave;
 window.deleteLeave = deleteLeave;
 window.viewLeave = viewLeave;
 window.openAbsenceForm = openAbsenceForm;
-window.saveAbsence = saveAbsence;
 window.editAbsence = editAbsence;
 window.deleteAbsence = deleteAbsence;
 window.viewAbsence = viewAbsence;
 window.openContractForm = openContractForm;
-window.saveContract = saveContract;
 window.editContract = editContract;
 window.deleteContract = deleteContract;
 window.viewContract = viewContract;
